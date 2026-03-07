@@ -1,3 +1,4 @@
+import os
 import joblib
 import pandas as pd
 
@@ -23,17 +24,19 @@ def evaluate(y_true, preds):
     return rmse, mae, r2
 
 
-def train_all_models():
+def train_models():
 
     df = load_data()
+
     X_train, X_test, y_train, y_test, preprocessor = split_data(df)
+
+    if not os.path.exists("models"):
+        os.makedirs("models")
 
     models = {
 
         "linear": LinearRegression(),
-
         "ridge": Ridge(),
-
         "lasso": Lasso(),
 
         "cart": DecisionTreeRegressor(random_state=42),
@@ -44,7 +47,6 @@ def train_all_models():
 
         "mlp": MLPRegressor(
             hidden_layer_sizes=(128,128),
-            activation="relu",
             max_iter=300,
             random_state=42
         )
@@ -52,21 +54,21 @@ def train_all_models():
 
     grids = {
 
-        "cart": {
+        "cart":{
             "model__max_depth":[3,5,7,10],
             "model__min_samples_leaf":[5,10,20]
         },
 
-        "random_forest": {
+        "random_forest":{
             "model__n_estimators":[100,200],
             "model__max_depth":[5,8]
         },
 
-        "lightgbm": {
+        "lightgbm":{
             "model__n_estimators":[100,200],
-            "model__max_depth":[3,5],
             "model__learning_rate":[0.01,0.05,0.1]
         }
+
     }
 
     results = []
@@ -80,34 +82,30 @@ def train_all_models():
 
         if name in grids:
 
-            search = GridSearchCV(
+            grid = GridSearchCV(
                 pipe,
                 grids[name],
                 cv=5,
-                scoring="neg_mean_squared_error",
-                n_jobs=-1
+                scoring="neg_mean_squared_error"
             )
 
-            search.fit(X_train, y_train)
-            best_model = search.best_estimator_
+            grid.fit(X_train, y_train)
+
+            best_model = grid.best_estimator_
 
         else:
+
             best_model = pipe.fit(X_train, y_train)
 
         preds = best_model.predict(X_test)
 
         rmse, mae, r2 = evaluate(y_test, preds)
 
-        results.append({
-            "model":name,
-            "RMSE":rmse,
-            "MAE":mae,
-            "R2":r2
-        })
+        results.append([name, rmse, mae, r2])
 
         joblib.dump(best_model, f"models/{name}.pkl")
 
-    results_df = pd.DataFrame(results)
+    results_df = pd.DataFrame(results, columns=["Model","RMSE","MAE","R2"])
 
     results_df.to_csv("model_results.csv", index=False)
 
@@ -115,4 +113,4 @@ def train_all_models():
 
 
 if __name__ == "__main__":
-    train_all_models()
+    train_models()

@@ -164,8 +164,7 @@ with tabs[3]:
         model = joblib.load(model_path)
 
         # Create default input template
-        X_template = df.drop(columns=["logmove"]).mean().to_frame().T
-
+        X_template = df.drop(columns=["logmove"]).select_dtypes(include=["number"]).mean().to_frame().T
         price = st.slider("Price",0.5,5.0,2.0)
         feat = st.selectbox("Promotion",[0,1])
 

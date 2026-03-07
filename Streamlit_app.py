@@ -1,24 +1,5 @@
 import streamlit as st
 import pandas as pd
-import joblib
-import seaborn as sns
-import matplotlib.pyplot as plt
-import numpy as np
-
-from preprocessing import load_data
-
-df = pd.read_csv("oj.csv")
-feature_columns = df.drop(columns=["logmove"]).columns
-input_df = df.drop(columns=["logmove"]).select_dtypes(include=np.number).mean().to_frame().T
-tabs = st.tabs([
-"Executive Summary",
-"Descriptive Analytics",
-"Model Performance",
-"Explainability & Prediction"
-])
-
-import streamlit as st
-import pandas as pd
 import numpy as np
 import joblib
 import seaborn as sns

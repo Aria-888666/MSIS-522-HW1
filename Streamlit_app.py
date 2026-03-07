@@ -3,6 +3,7 @@ import pandas as pd
 import joblib
 import seaborn as sns
 import matplotlib.pyplot as plt
+import numpy as np
 
 from preprocessing import load_data
 

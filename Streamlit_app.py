@@ -164,17 +164,24 @@ with tabs[3]:
         model = joblib.load(model_path)
 
     # Create template row using the first row of the dataset
+    # Create template row from dataset
     X_template = df.drop(columns=["logmove"]).iloc[[0]].copy()
 
+    # User inputs
     price = st.slider("Price", 0.5, 5.0, 2.0)
-    feat = st.selectbox("Promotion", [0,1])
+    feat = st.selectbox("Promotion", [0, 1])
 
+    # Update values
     if "price" in X_template.columns:
-        X_template["price"] = price
+        X_template.loc[:, "price"] = price
 
     if "feat" in X_template.columns:
-        X_template["feat"] = feat
+        X_template.loc[:, "feat"] = feat
 
+    # Ensure column order matches training data
+    X_template = X_template[df.drop(columns=["logmove"]).columns]
+
+    # Predict
     prediction = model.predict(X_template)[0]
     st.write("Predicted log sales:", prediction)
         

@@ -1,0 +1,8 @@
+models/
+   linear.pkl
+   ridge.pkl
+   lasso.pkl
+   cart.pkl
+   random_forest.pkl
+   lightgbm.pkl
+   mlp.pkl

@@ -1,9 +1,9 @@
 streamlit
 pandas
 numpy
-scikit-learn==1.3.2
-lightgbm==4.3.0
-shap==0.45.0
+scikit-learn
+lightgbm
+shap
 joblib
 matplotlib
 seaborn

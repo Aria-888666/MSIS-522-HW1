@@ -1,10 +1,10 @@
 streamlit
 pandas
 numpy
-scikit-learn
-lightgbm
-shap
+scikit-learn>=1.4
+lightgbm>=4.3
+shap>=0.45
 joblib
 matplotlib
 seaborn
-altair
+altair>=5

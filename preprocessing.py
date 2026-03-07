@@ -1,4 +1,5 @@
 import pandas as pd
+
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.compose import ColumnTransformer
@@ -7,13 +8,10 @@ from sklearn.impute import SimpleImputer
 
 TARGET = "logmove"
 
+def load_data():
 
-def load_data(path="data/oj.csv"):
-    """
-    Load dataset.
-    I keep this function simple so the workflow is easy to follow.
-    """
-    df = pd.read_csv(path)
+    df = pd.read_csv("oj.csv")
+
     return df
 
 
@@ -23,7 +21,7 @@ def split_data(df):
     y = df[TARGET]
 
     categorical_cols = X.select_dtypes(include=["object"]).columns
-    numeric_cols = X.select_dtypes(include=["int64", "float64"]).columns
+    numeric_cols = X.select_dtypes(include=["int64","float64"]).columns
 
     numeric_pipeline = Pipeline([
         ("imputer", SimpleImputer(strategy="median")),
@@ -42,7 +40,7 @@ def split_data(df):
 
     X_train, X_test, y_train, y_test = train_test_split(
         X, y,
-        test_size=0.30,
+        test_size=0.3,
         random_state=42
     )
 

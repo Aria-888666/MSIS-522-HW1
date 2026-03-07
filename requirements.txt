@@ -7,3 +7,4 @@ lightgbm
 shap
 streamlit
 joblib
+altair==4.2.2

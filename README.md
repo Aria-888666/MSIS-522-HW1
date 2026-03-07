@@ -32,3 +32,15 @@ units sold.
 ### Run the Project
 
 Train models:
+python src/train_models.py
+
+Run the Streamlit app:
+streamlit run app.py
+
+## Streamlit App
+
+The Streamlit app contains four sections:
+1. Executive Summary
+2. Descriptive Analytics
+3. Model Performance
+4. Explainability & Interactive Prediction

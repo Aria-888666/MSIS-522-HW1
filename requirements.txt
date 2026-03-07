@@ -1,6 +1,6 @@
 streamlit
 pandas
-numpy
+numpy<2
 scikit-learn>=1.6
 lightgbm==4.3.0
 shap==0.45.1

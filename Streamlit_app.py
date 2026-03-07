@@ -163,22 +163,21 @@ with tabs[3]:
 
         model = joblib.load(model_path)
 
-        # Create default input template
-        X_template = df.drop(columns=["logmove"]).select_dtypes(include=["number"]).mean().to_frame().T
-        price = st.slider("Price",0.5,5.0,2.0)
-        feat = st.selectbox("Promotion",[0,1])
+    # Create template row using the first row of the dataset
+    X_template = df.drop(columns=["logmove"]).iloc[[0]].copy()
 
-        if "price" in X_template.columns:
-            X_template["price"] = price
+    price = st.slider("Price", 0.5, 5.0, 2.0)
+    feat = st.selectbox("Promotion", [0,1])
 
-        if "feat" in X_template.columns:
-            X_template["feat"] = feat
+    if "price" in X_template.columns:
+        X_template["price"] = price
 
-        prediction = model.predict(X_template)[0]
+    if "feat" in X_template.columns:
+        X_template["feat"] = feat
 
-        st.subheader("Predicted Log Sales")
-
-        st.write(prediction)
+    prediction = model.predict(X_template)[0]
+    st.write("Predicted log sales:", prediction)
+        
 
     st.header("Model Explainability (SHAP)")
 

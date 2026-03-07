@@ -17,8 +17,15 @@ from preprocessing import load_data, split_data
 
 def evaluate(y_true, preds):
 
-    rmse = mean_squared_error(y_true, preds, squared=False)
+    import numpy as np
+    from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+
+    mse = mean_squared_error(y_true, preds)
+
+    rmse = np.sqrt(mse)
+
     mae = mean_absolute_error(y_true, preds)
+
     r2 = r2_score(y_true, preds)
 
     return rmse, mae, r2

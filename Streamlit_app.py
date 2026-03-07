@@ -8,8 +8,7 @@ from preprocessing import load_data
 
 df = pd.read_csv("oj.csv")
 feature_columns = df.drop(columns=["logmove"]).columns
-input_df = pd.DataFrame([df.drop(columns=["logmove"]).mean()])
-
+input_df = df.drop(columns=["logmove"]).select_dtypes(include=np.number).mean().to_frame().T
 tabs = st.tabs([
 "Executive Summary",
 "Descriptive Analytics",

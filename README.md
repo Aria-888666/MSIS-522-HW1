@@ -8,11 +8,11 @@
 
 ## 🔗 Live Streamlit App
 
-👉 **[https://msis-522-hw1-n6z6tdadib5xgjibjxpdvc.streamlit.app](https://msis-522-hw1-n6z6tdadib5xgjibjxpdvc.streamlit.app)**
+ **[https://msis-522-hw1-n6z6tdadib5xgjibjxpdvc.streamlit.app](https://msis-522-hw1-n6z6tdadib5xgjibjxpdvc.streamlit.app)**
 
 ---
 
-## 📋 Project Overview
+## Project Overview
 
 This project implements the full end-to-end data science workflow on the
 **Dominick's Finer Foods Orange Juice dataset** — a classic retail analytics dataset
@@ -25,7 +25,7 @@ containing weekly store-level observations of orange juice sales across multiple
 
 ---
 
-## 📁 Repository Structure
+## Repository Structure
 
 ```
 MSIS-522-HW1/
@@ -49,7 +49,7 @@ MSIS-522-HW1/
 
 ---
 
-## 🚀 How to Run Locally
+## How to Run Locally
 
 ### 1. Clone the repository
 
@@ -64,7 +64,7 @@ cd MSIS-522-HW1
 pip install -r requirements.txt
 ```
 
-> ⚠️ **Important:** The `scikit-learn` version in `requirements.txt` must match the version
+> **Important:** The `scikit-learn` version in `requirements.txt` must match the version
 > used to train the saved `.pkl` models. If you retrain locally, update `requirements.txt`
 > with the exact version printed by `python train_models.py`.
 
@@ -81,7 +81,7 @@ This will:
 - Save test-set metrics to `model_results.csv`
 - Print best hyperparameters and metrics to the console
 
-### 4. (Optional) Run SHAP analysis
+### 4. Run SHAP analysis
 
 ```bash
 python shap_analysis.py
@@ -99,7 +99,7 @@ Then open [http://localhost:8501](http://localhost:8501) in your browser.
 
 ---
 
-## 🤖 Models Trained
+## Models Trained
 
 | Model | Hyperparameters Tuned (GridSearchCV) |
 |---|---|
@@ -116,14 +116,14 @@ All models use `random_state=42`. Cross-validation uses 5 folds, scoring on
 
 ---
 
-## 📊 Streamlit App — Tab Overview
+## Streamlit App — Tab Overview
 
 | Tab | Contents |
 |---|---|
-| 📋 Executive Summary | Dataset description, business context, approach, key findings |
-| 📊 Descriptive Analytics | Target distribution, 4+ feature visualizations, correlation heatmap |
-| 🤖 Model Performance | Results table, RMSE bar chart, predicted vs actual plots, decision tree viz, MLP loss curve, hyperparameter table |
-| 🔍 Explainability & Prediction | SHAP beeswarm, bar plot, waterfall; interactive prediction with price/promotion/brand sliders; per-input SHAP waterfall |
+| Executive Summary | Dataset description, business context, approach, key findings |
+| Descriptive Analytics | Target distribution, 4+ feature visualizations, correlation heatmap |
+| Model Performance | Results table, RMSE bar chart, predicted vs actual plots, decision tree viz, MLP loss curve, hyperparameter table |
+| Explainability & Prediction | SHAP beeswarm, bar plot, waterfall; interactive prediction with price/promotion/brand sliders; per-input SHAP waterfall |
 
 > **Note:** The Streamlit app trains fresh models at runtime to avoid sklearn version
 > compatibility issues with the saved `.pkl` files. The `.pkl` files are used only when
@@ -131,7 +131,7 @@ All models use `random_state=42`. Cross-validation uses 5 folds, scoring on
 
 ---
 
-## ⚙️ Requirements
+## Requirements
 
 Key dependencies (see `requirements.txt` for full pinned versions):
 
@@ -146,15 +146,3 @@ matplotlib
 seaborn
 joblib
 ```
-
----
-
-## 📝 Assignment Structure
-
-| Component | Points |
-|---|---|
-| Part 1: Descriptive Analytics | 25 |
-| Part 2: Predictive Analytics (7 models) | 45 |
-| Part 3: Explainability (SHAP) | 10 |
-| Part 4: Streamlit Deployment | 20 |
-| **Total** | **100** |

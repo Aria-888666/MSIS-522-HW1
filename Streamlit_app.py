@@ -279,76 +279,90 @@ The plots below use the **Random Forest** model, which has strong predictive per
 supports efficient SHAP computation.
 """)
 
-    if os.path.exists("models/random_forest.pkl"):
-        rf_pipeline = joblib.load("models/random_forest.pkl")
+    # ── Train a fresh RF purely from the CSV for SHAP ────────────────────────
+    # The saved .pkl pipelines contain a SimpleImputer pickled with an older
+    # sklearn. Any call to pipeline.predict() or pipeline.transform() internally
+    # runs that broken imputer and raises:
+    #   AttributeError: 'SimpleImputer' object has no attribute '_fill_dtype'
+    #
+    # Fix: never load the pkl for SHAP at all. Instead, train a lightweight
+    # RandomForest directly on the CSV data using only pandas + current sklearn.
+    # This model is used exclusively for SHAP — the pkl models are still used
+    # for predictions in the interactive section below.
+    # ─────────────────────────────────────────────────────────────────────────
 
-        # ── SHAP via KernelExplainer ──────────────────────────────────────────────
-        # We CANNOT call pipeline.steps manually — the saved SimpleImputer was built
-        # with an older sklearn that stored _fill_dtype, which newer sklearn removed.
-        # Manually calling step.transform() triggers that broken attribute.
-        #
-        # Solution: treat the entire pipeline as a black box using KernelExplainer,
-        # which only ever calls pipeline.predict(X) on raw input — never touching
-        # any internal pipeline attributes. Raw feature names are preserved throughout.
-        # ─────────────────────────────────────────────────────────────────────────
+    @st.cache_resource
+    def build_shap_model(csv_path: str):
+        """
+        Trains a fresh RandomForestRegressor directly on oj.csv.
+        No Pipeline, no saved imputer — pure current-sklearn operations only.
+        Cached so it only trains once per Streamlit session.
+        """
+        from sklearn.ensemble import RandomForestRegressor
+        from sklearn.model_selection import train_test_split
 
-        # Use numeric-only columns for SHAP (encode brand as integer label)
-        X_shap = df[FEATURE_COLS].copy()
-        for col in CAT_COLS:
-            X_shap[col] = X_shap[col].astype("category").cat.codes
-        X_shap = X_shap.astype(float)
+        data = pd.read_csv(csv_path)
+        X = data.drop(columns=["logmove"]).copy()
+        y = data["logmove"].copy()
 
-        # Small background sample (KernelExplainer is slow — keep it tight)
-        background = shap.sample(X_shap, 50, random_state=42)
-        X_explain  = X_shap.sample(50, random_state=42)
+        # Encode categoricals with label encoding (no imputer needed — oj.csv has no nulls)
+        cat_cols_local = X.select_dtypes(exclude=[np.number]).columns.tolist()
+        for col in cat_cols_local:
+            X[col] = X[col].astype("category").cat.codes
 
-        # Wrap pipeline.predict so KernelExplainer only ever sees numpy arrays
-        def model_predict(X_array):
-            X_df = pd.DataFrame(X_array, columns=FEATURE_COLS)
-            return rf_pipeline.predict(X_df)
+        # Fill any remaining NaNs with column median (pure pandas, no sklearn imputer)
+        X = X.fillna(X.median(numeric_only=True))
+        X = X.astype(float)
 
-        with st.spinner("Computing SHAP values — this takes ~30 seconds..."):
-            try:
-                explainer   = shap.KernelExplainer(model_predict, background.values)
-                shap_vals   = explainer.shap_values(X_explain.values, nsamples=100)
-                shap_ok     = True
-            except Exception as e:
-                shap_ok = False
-                st.error(f"SHAP computation failed: {e}")
+        X_tr, _, y_tr, _ = train_test_split(X, y, test_size=0.3, random_state=42)
 
-        if shap_ok:
-            st.subheader("1. SHAP Summary Plot (Beeswarm)")
-            fig, ax = plt.subplots()
-            shap.summary_plot(shap_vals, X_explain, feature_names=FEATURE_COLS, show=False)
-            st.pyplot(fig)
-            st.caption("""
-**How to read this:** Each dot is one observation. Its x-position is its SHAP value — how much that
-feature shifted the prediction up or down from the baseline. Color shows the raw feature value
-(red = high, blue = low). Features are sorted top-to-bottom by mean absolute SHAP value, so the
-most influential drivers appear first.
+        rf = RandomForestRegressor(n_estimators=100, max_depth=8, random_state=42, n_jobs=-1)
+        rf.fit(X_tr, y_tr)
+        return rf, X.columns.tolist(), X
+
+    with st.spinner("Training SHAP model from data (first load only)..."):
+        shap_rf, shap_feature_names, X_all_enc = build_shap_model("oj.csv")
+
+    X_explain = X_all_enc.sample(200, random_state=42)
+
+    with st.spinner("Computing SHAP values with TreeExplainer..."):
+        try:
+            explainer = shap.TreeExplainer(shap_rf)
+            shap_vals = explainer.shap_values(X_explain)
+            shap_ok   = True
+        except Exception as e:
+            shap_ok = False
+            st.error(f"SHAP computation failed: {e}")
+
+    if shap_ok:
+        st.subheader("1. SHAP Summary Plot (Beeswarm)")
+        fig, ax = plt.subplots()
+        shap.summary_plot(shap_vals, X_explain, feature_names=shap_feature_names, show=False)
+        st.pyplot(fig)
+        st.caption("""
+**How to read this:** Each dot is one observation. Its x-position shows how much that feature
+shifted the prediction up or down from the baseline average. Color shows the raw feature value
+(red = high, blue = low). Features are sorted by mean absolute SHAP value — the most influential
+drivers appear at the top.
 """)
 
-            st.subheader("2. Mean Absolute SHAP Feature Importance")
-            mean_shap = np.abs(shap_vals).mean(axis=0)
-            importance_df = pd.DataFrame({
-                "Feature": FEATURE_COLS,
-                "Mean |SHAP|": mean_shap
-            }).sort_values("Mean |SHAP|", ascending=True)
+        st.subheader("2. Mean Absolute SHAP Feature Importance")
+        mean_shap = np.abs(shap_vals).mean(axis=0)
+        importance_df = pd.DataFrame({
+            "Feature":    shap_feature_names,
+            "Mean |SHAP|": mean_shap
+        }).sort_values("Mean |SHAP|", ascending=True)
 
-            fig, ax = plt.subplots(figsize=(7, max(3, len(FEATURE_COLS) * 0.35)))
-            ax.barh(importance_df["Feature"], importance_df["Mean |SHAP|"], color="steelblue")
-            ax.set_xlabel("Mean absolute SHAP value")
-            ax.set_title("Global Feature Importance (SHAP)")
-            st.pyplot(fig)
-            st.caption("""
-**How to read this:** Each bar shows the average magnitude of a feature's impact across all
-50 explained predictions. Longer bars = larger average effect on the prediction, regardless of
-direction. This is a model-agnostic importance ranking — unlike built-in tree impurity scores,
-SHAP importance reflects the actual prediction contribution.
+        fig, ax = plt.subplots(figsize=(7, max(3, len(shap_feature_names) * 0.35)))
+        ax.barh(importance_df["Feature"], importance_df["Mean |SHAP|"], color="steelblue")
+        ax.set_xlabel("Mean absolute SHAP value")
+        ax.set_title("Global Feature Importance (SHAP — Random Forest)")
+        st.pyplot(fig)
+        st.caption("""
+**How to read this:** Each bar is the average magnitude of a feature's SHAP contribution across
+200 observations. Longer bars mean larger average prediction impact. Unlike tree impurity importance,
+SHAP values reflect actual prediction contributions and are not biased toward high-cardinality features.
 """)
-
-    else:
-        st.warning("⚠️ `models/random_forest.pkl` not found. Please train models first.")
 
     st.markdown("---")
     st.header("🎯 Interactive Prediction")
@@ -431,57 +445,51 @@ the **{selected_label}** model predicts approximately **{predicted_units:,} unit
             st.error(f"Prediction failed: {e}")
 
         # SHAP waterfall for user input (RF only)
-        if model_key == "random_forest" and os.path.exists("models/random_forest.pkl"):
+        if model_key == "random_forest":
             st.subheader("🌊 SHAP Waterfall Plot for Your Input")
             st.markdown("""
 The waterfall plot below explains *this specific prediction* — showing how each feature pushed
 the predicted sales up (red ↑) or down (blue ↓) from the model's average baseline.
 """)
             try:
-                # Build encoded version of the user input (same encoding as X_shap above)
+                # Build encoded user input aligned to shap_feature_names
+                # (same label-encoding used in build_shap_model — no pkl touched)
                 X_user = pd.DataFrame([{
                     col: df[col].mean() if col in NUM_COLS else df[col].mode()[0]
-                    for col in FEATURE_COLS
+                    for col in shap_feature_names
                 }])
                 if "price" in X_user.columns:
                     X_user["price"] = price_val
                 if "feat" in X_user.columns:
                     X_user["feat"] = float(feat_val)
                 for col in CAT_COLS:
-                    X_user[col] = pd.Categorical(
-                        X_user[col], categories=df[col].astype("category").cat.categories
-                    ).codes
-                X_user = X_user[FEATURE_COLS].astype(float)
+                    if col in X_user.columns:
+                        X_user[col] = pd.Categorical(
+                            X_user[col],
+                            categories=df[col].astype("category").cat.categories
+                        ).codes
+                X_user = X_user[shap_feature_names].astype(float)
 
-                # Reuse the same black-box wrapper — never calls internal pipeline steps
-                rf_wf = joblib.load("models/random_forest.pkl")
-
-                X_bg_enc = df[FEATURE_COLS].copy()
-                for col in CAT_COLS:
-                    X_bg_enc[col] = X_bg_enc[col].astype("category").cat.codes
-                X_bg_enc = X_bg_enc.astype(float)
-                bg_wf = shap.sample(X_bg_enc, 50, random_state=42)
-
-                def rf_predict(X_array):
-                    X_df = pd.DataFrame(X_array, columns=FEATURE_COLS)
-                    return rf_wf.predict(X_df)
-
-                exp_wf = shap.KernelExplainer(rf_predict, bg_wf.values)
-                sv_wf  = exp_wf.shap_values(X_user.values, nsamples=100)
-
-                # Manual waterfall bar chart (avoids shap.plots.waterfall dependency on Explanation object)
-                sv_row   = sv_wf[0]
+                # Use the already-built shap_rf (fresh model, no broken pickle)
+                exp_wf  = shap.TreeExplainer(shap_rf)
+                sv_wf   = exp_wf.shap_values(X_user)
+                sv_row  = sv_wf[0]
                 base_val = exp_wf.expected_value
-                indices  = np.argsort(np.abs(sv_row))[::-1][:10]  # top-10 features
-                labels   = [FEATURE_COLS[i] for i in indices]
-                values   = sv_row[indices]
-                colors   = ["#e74c3c" if v > 0 else "#3498db" for v in values]
 
-                fig, ax = plt.subplots(figsize=(7, 5))
-                ax.barh(labels[::-1], values[::-1], color=colors[::-1])
+                top_n   = min(10, len(shap_feature_names))
+                indices = np.argsort(np.abs(sv_row))[::-1][:top_n]
+                labels  = [shap_feature_names[i] for i in indices][::-1]
+                values  = sv_row[indices][::-1]
+                colors  = ["#e74c3c" if v > 0 else "#3498db" for v in values]
+
+                fig, ax = plt.subplots(figsize=(7, max(4, top_n * 0.45)))
+                ax.barh(labels, values, color=colors)
                 ax.axvline(0, color="black", linewidth=0.8)
-                ax.set_xlabel("SHAP value (impact on prediction)")
-                ax.set_title(f"Waterfall — baseline: {base_val:.2f}, prediction: {base_val + sv_row.sum():.2f}")
+                ax.set_xlabel("SHAP value (impact on log sales)")
+                ax.set_title(
+                    f"Waterfall — baseline: {base_val:.3f} | "
+                    f"prediction: {base_val + sv_row.sum():.3f}"
+                )
                 st.pyplot(fig)
 
             except Exception as e:

@@ -401,132 +401,149 @@ SHAP values reflect actual prediction contributions and are not biased toward hi
 """)
 
     st.markdown("---")
+
+    st.markdown("---")
     st.header("🎯 Interactive Prediction")
     st.markdown("""
-Use the controls below to set feature values and see what a selected model predicts for weekly
-orange juice sales. All other features are held at their dataset mean (for numeric features) or
-most common value (for categorical features). The predicted value is in **log-units** — to convert
-to actual units, compute `exp(predicted value)`.
+Use the controls below to set feature values and see what any model predicts for weekly orange
+juice sales. All other features are held at their dataset mean (numeric) or most common value
+(categorical). The predicted value is in **log-units** — to convert to actual units: `exp(value)`.
+
+> **Note:** Models are trained fresh from the dataset on first load and cached for the session.
+> This avoids version-compatibility issues with saved model files.
 """)
 
-    model_options = {
-        "Linear Regression": "linear",
-        "Ridge Regression": "ridge",
-        "Lasso Regression": "lasso",
-        "Decision Tree (CART)": "cart",
-        "Random Forest": "random_forest",
-        "LightGBM": "lightgbm",
-        "Neural Network (MLP)": "mlp"
-    }
+    # ── Train all models fresh from data (cached per session) ────────────────
+    # We do NOT load the .pkl files here. The saved pipelines contain a
+    # SimpleImputer pickled under an older sklearn version which raises:
+    #   AttributeError: 'SimpleImputer' object has no attribute '_fill_dtype'
+    # Training fresh from the CSV costs ~15s once then is cached for the session.
+    # ─────────────────────────────────────────────────────────────────────────
 
-    selected_label = st.selectbox("**Select a model to use for prediction:**", list(model_options.keys()))
-    model_key = model_options[selected_label]
-    model_path = f"models/{model_key}.pkl"
+    @st.cache_resource
+    def build_all_models(_df):
+        from sklearn.linear_model import LinearRegression, Ridge, Lasso
+        from sklearn.tree import DecisionTreeRegressor
+        from sklearn.ensemble import RandomForestRegressor
+        from sklearn.neural_network import MLPRegressor
+        from sklearn.model_selection import train_test_split
 
-    if not os.path.exists(model_path):
-        st.error(f"Model file `{model_path}` not found. Please run `train_models.py` first.")
-    else:
-        model = joblib.load(model_path)
+        data = _df.copy()
+        X = data.drop(columns=["logmove"]).copy()
+        y = data["logmove"].copy()
 
-        st.subheader("Set Feature Values")
+        cat_cols_l = X.select_dtypes(exclude=[np.number]).columns.tolist()
+        for col in cat_cols_l:
+            X[col] = X[col].astype("category").cat.codes
+        X = X.fillna(X.median(numeric_only=True)).astype(float)
 
-        col1, col2 = st.columns(2)
-        with col1:
-            price_val = st.slider("💲 Price ($)", 0.5, 5.0, float(df["price"].mean()), step=0.05,
-                                  help="The retail shelf price of the orange juice this week.")
-        with col2:
-            feat_val = st.selectbox("📢 On Promotion? (feat)", [0, 1],
-                                    format_func=lambda x: "Yes — featured in flyer" if x == 1 else "No promotion",
-                                    help="Whether the product was featured in a store advertisement this week.")
+        feat_names = X.columns.tolist()
+        X_tr, _, y_tr, _ = train_test_split(X, y, test_size=0.3, random_state=42)
 
-        # Build template using dataset means / modes for all other features
-        X_template = pd.DataFrame([{
-            col: df[col].mean() if col in NUM_COLS else df[col].mode()[0]
-            for col in FEATURE_COLS
-        }])
-
-        # Override user-controlled features
-        if "price" in X_template.columns:
-            X_template["price"] = price_val
-        if "feat" in X_template.columns:
-            X_template["feat"] = float(feat_val)
-
-        # Encode categoricals to match training pipeline
-        for col in CAT_COLS:
-            X_template[col] = pd.Categorical(X_template[col],
-                                              categories=df[col].astype("category").cat.categories).codes
-
-        # Ensure correct column order
-        X_template = X_template[FEATURE_COLS]
-
-        # Cast all columns to float to avoid dtype mismatch in sklearn imputer
-        X_template = X_template.astype(float)
-
+        specs = {
+            "Linear Regression":    LinearRegression(),
+            "Ridge Regression":     Ridge(),
+            "Lasso Regression":     Lasso(),
+            "Decision Tree (CART)": DecisionTreeRegressor(max_depth=5, random_state=42),
+            "Random Forest":        RandomForestRegressor(n_estimators=100, max_depth=8,
+                                                          random_state=42, n_jobs=-1),
+            "Neural Network (MLP)": MLPRegressor(hidden_layer_sizes=(128, 128),
+                                                  max_iter=300, random_state=42),
+        }
         try:
-            prediction = model.predict(X_template)[0]
-            predicted_units = int(np.exp(prediction))
+            from lightgbm import LGBMRegressor
+            specs["LightGBM"] = LGBMRegressor(n_estimators=100, random_state=42, verbose=-1)
+        except ImportError:
+            pass
 
-            st.markdown("---")
-            col_a, col_b = st.columns(2)
-            col_a.metric("📦 Predicted log(sales)", f"{prediction:.3f}")
-            col_b.metric("📦 Predicted units sold (approx.)", f"{predicted_units:,}")
+        trained = {}
+        for label, mdl in specs.items():
+            mdl.fit(X_tr, y_tr)
+            trained[label] = mdl
 
-            st.info(f"""
-**Interpretation:** With a price of **${price_val:.2f}** and promotion status **{'ON' if feat_val == 1 else 'OFF'}**,
-the **{selected_label}** model predicts approximately **{predicted_units:,} units** will be sold
-(log-sales = {prediction:.3f}). All other features are held at their dataset averages.
+        return trained, feat_names
+
+    with st.spinner("Training models from data (first load only — ~15 seconds)..."):
+        all_models, pred_feature_names = build_all_models(df)
+
+    selected_label = st.selectbox(
+        "**Select a model to use for prediction:**",
+        list(all_models.keys())
+    )
+    chosen_model = all_models[selected_label]
+
+    col1, col2 = st.columns(2)
+    with col1:
+        price_val = st.slider(
+            "💲 Price ($)", 0.5, 5.0, float(df["price"].mean()), step=0.05,
+            help="The retail shelf price of the orange juice this week."
+        )
+    with col2:
+        feat_val = st.selectbox(
+            "📢 On Promotion? (feat)", [0, 1],
+            format_func=lambda x: "Yes — featured in flyer" if x == 1 else "No promotion",
+            help="Whether the product was featured in a store advertisement this week."
+        )
+
+    # Build encoded input row — no sklearn imputer, pure pandas
+    X_input = pd.DataFrame([{
+        col: df[col].mean() if col in NUM_COLS else df[col].mode()[0]
+        for col in pred_feature_names
+    }])
+    if "price" in X_input.columns:
+        X_input["price"] = price_val
+    if "feat" in X_input.columns:
+        X_input["feat"] = float(feat_val)
+    for col in CAT_COLS:
+        if col in X_input.columns:
+            X_input[col] = pd.Categorical(
+                X_input[col], categories=df[col].astype("category").cat.categories
+            ).codes
+    X_input = X_input[pred_feature_names].astype(float)
+
+    prediction      = chosen_model.predict(X_input)[0]
+    predicted_units = int(np.exp(prediction))
+
+    st.markdown("---")
+    col_a, col_b = st.columns(2)
+    col_a.metric("📦 Predicted log(sales)", f"{prediction:.3f}")
+    col_b.metric("📦 Predicted units sold (approx.)", f"{predicted_units:,}")
+
+    st.info(f"""
+**Interpretation:** With a price of **${price_val:.2f}** and promotion status
+**{'ON' if feat_val == 1 else 'OFF'}**, the **{selected_label}** model predicts approximately
+**{predicted_units:,} units** will be sold (log-sales = {prediction:.3f}).
+All other features are held at their dataset averages.
 """)
 
-        except Exception as e:
-            st.error(f"Prediction failed: {e}")
-
-        # SHAP waterfall for user input (RF only)
-        if model_key == "random_forest":
-            st.subheader("🌊 SHAP Waterfall Plot for Your Input")
-            st.markdown("""
+    # SHAP waterfall (RF only — uses the same fresh model, no pkl)
+    if selected_label == "Random Forest":
+        st.subheader("🌊 SHAP Waterfall Plot for Your Input")
+        st.markdown("""
 The waterfall plot below explains *this specific prediction* — showing how each feature pushed
 the predicted sales up (red ↑) or down (blue ↓) from the model's average baseline.
 """)
-            try:
-                # Build encoded user input aligned to shap_feature_names
-                # (same label-encoding used in build_shap_model — no pkl touched)
-                X_user = pd.DataFrame([{
-                    col: df[col].mean() if col in NUM_COLS else df[col].mode()[0]
-                    for col in shap_feature_names
-                }])
-                if "price" in X_user.columns:
-                    X_user["price"] = price_val
-                if "feat" in X_user.columns:
-                    X_user["feat"] = float(feat_val)
-                for col in CAT_COLS:
-                    if col in X_user.columns:
-                        X_user[col] = pd.Categorical(
-                            X_user[col],
-                            categories=df[col].astype("category").cat.categories
-                        ).codes
-                X_user = X_user[shap_feature_names].astype(float)
+        try:
+            exp_wf   = shap.TreeExplainer(chosen_model)
+            sv_wf    = exp_wf.shap_values(X_input)
+            sv_row   = sv_wf[0]
+            base_val = exp_wf.expected_value
 
-                # Use the already-built shap_rf (fresh model, no broken pickle)
-                exp_wf  = shap.TreeExplainer(shap_rf)
-                sv_wf   = exp_wf.shap_values(X_user)
-                sv_row  = sv_wf[0]
-                base_val = exp_wf.expected_value
+            top_n   = min(10, len(pred_feature_names))
+            indices = np.argsort(np.abs(sv_row))[::-1][:top_n]
+            labels  = [pred_feature_names[i] for i in indices][::-1]
+            values  = sv_row[indices][::-1]
+            colors  = ["#e74c3c" if v > 0 else "#3498db" for v in values]
 
-                top_n   = min(10, len(shap_feature_names))
-                indices = np.argsort(np.abs(sv_row))[::-1][:top_n]
-                labels  = [shap_feature_names[i] for i in indices][::-1]
-                values  = sv_row[indices][::-1]
-                colors  = ["#e74c3c" if v > 0 else "#3498db" for v in values]
+            fig, ax = plt.subplots(figsize=(7, max(4, top_n * 0.45)))
+            ax.barh(labels, values, color=colors)
+            ax.axvline(0, color="black", linewidth=0.8)
+            ax.set_xlabel("SHAP value (impact on log sales)")
+            ax.set_title(
+                f"Waterfall — baseline: {base_val:.3f} | "
+                f"prediction: {base_val + sv_row.sum():.3f}"
+            )
+            st.pyplot(fig)
 
-                fig, ax = plt.subplots(figsize=(7, max(4, top_n * 0.45)))
-                ax.barh(labels, values, color=colors)
-                ax.axvline(0, color="black", linewidth=0.8)
-                ax.set_xlabel("SHAP value (impact on log sales)")
-                ax.set_title(
-                    f"Waterfall — baseline: {base_val:.3f} | "
-                    f"prediction: {base_val + sv_row.sum():.3f}"
-                )
-                st.pyplot(fig)
-
-            except Exception as e:
-                st.warning(f"Could not generate waterfall plot: {e}")
+        except Exception as e:
+            st.warning(f"Could not generate waterfall plot: {e}")

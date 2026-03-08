@@ -9,8 +9,43 @@ import os
 
 st.set_page_config(page_title="Orange Juice Demand Prediction", layout="wide")
 
-# Load dataset
-df = pd.read_csv("oj.csv")
+@st.cache_data
+def load_df():
+    """
+    Load the OJ dataset. Tries local file first; falls back to downloading
+    from a public URL if the local file is missing or empty (e.g. Git LFS issue).
+    """
+    local_path = "oj.csv"
+
+    # Check local file is non-empty
+    if os.path.exists(local_path) and os.path.getsize(local_path) > 1000:
+        return pd.read_csv(local_path)
+
+    # Fallback: download from public source
+    import urllib.request
+    url = "https://raw.githubusercontent.com/cran/bayesm/master/data-raw/orangeJuice.csv"
+    fallback_path = "/tmp/oj.csv"
+    try:
+        urllib.request.urlretrieve(url, fallback_path)
+        raw = pd.read_csv(fallback_path)
+        # Standardise column names to lowercase
+        raw.columns = [c.lower() for c in raw.columns]
+        # Rename to match expected schema if needed
+        rename_map = {}
+        if "move"    in raw.columns and "logmove" not in raw.columns:
+            raw["logmove"] = np.log(raw["move"])
+        if "store"   in raw.columns: rename_map["store"]   = "store"
+        raw = raw.rename(columns=rename_map)
+        return raw
+    except Exception as e:
+        st.error(
+            f"Could not load oj.csv locally or from fallback URL.\n\n"
+            f"Please make sure oj.csv is committed to your GitHub repo as a real file "
+            f"(not a Git LFS pointer). Error: {e}"
+        )
+        st.stop()
+
+df = load_df()
 
 # Identify feature columns (everything except target)
 FEATURE_COLS = [c for c in df.columns if c != "logmove"]
@@ -292,16 +327,17 @@ supports efficient SHAP computation.
     # ─────────────────────────────────────────────────────────────────────────
 
     @st.cache_resource
-    def build_shap_model(csv_path: str):
+    def build_shap_model(_df):
         """
-        Trains a fresh RandomForestRegressor directly on oj.csv.
+        Trains a fresh RandomForestRegressor on the already-loaded DataFrame.
         No Pipeline, no saved imputer — pure current-sklearn operations only.
         Cached so it only trains once per Streamlit session.
+        _df is prefixed with _ so Streamlit doesn't try to hash it.
         """
         from sklearn.ensemble import RandomForestRegressor
         from sklearn.model_selection import train_test_split
 
-        data = pd.read_csv(csv_path)
+        data = _df.copy()
         X = data.drop(columns=["logmove"]).copy()
         y = data["logmove"].copy()
 
@@ -321,7 +357,7 @@ supports efficient SHAP computation.
         return rf, X.columns.tolist(), X
 
     with st.spinner("Training SHAP model from data (first load only)..."):
-        shap_rf, shap_feature_names, X_all_enc = build_shap_model("oj.csv")
+        shap_rf, shap_feature_names, X_all_enc = build_shap_model(df)
 
     X_explain = X_all_enc.sample(200, random_state=42)
 

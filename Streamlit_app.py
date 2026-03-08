@@ -117,7 +117,7 @@ with tabs[0]:
     st.markdown("**MSIS 522 — Analytics and Machine Learning | Foster School of Business, UW**")
     st.markdown("---")
 
-    st.header("📌 About the Dataset")
+    st.header("About the Dataset")
     st.markdown(f"""
 This project uses the **Dominick's Finer Foods Orange Juice dataset**, a classic retail analytics
 dataset widely used in marketing and demand-forecasting research. It contains
@@ -154,7 +154,7 @@ model training.
         })
         st.dataframe(summary, use_container_width=True)
 
-    st.header("💡 Why This Problem Matters")
+    st.header("Why This Problem Matters")
     st.markdown("""
 Accurate demand forecasting is a cornerstone of retail operations. Retailers and manufacturers use
 sales predictions to make decisions about:
@@ -169,7 +169,7 @@ A model that accurately predicts the sales lift from a price cut or a feature ad
 actionable for category managers and supply chain planners.
 """)
 
-    st.header("🔬 Approach & Key Findings")
+    st.header("Approach & Key Findings")
     # Show live best-model metrics in summary
     best_row = live_metrics.sort_values("RMSE").iloc[0]
     st.markdown(f"""
@@ -182,18 +182,18 @@ This project implements the complete data science workflow:
 4. **Deployment** — All findings surfaced in this interactive Streamlit app.
 
 **Key findings:**
-- 🏆 **Best model: {best_row['Model']}** — Test RMSE = **{best_row['RMSE']:.4f}**, R² = **{best_row['R2']:.4f}**
-- 📉 **Price is the single strongest predictor** — higher prices strongly reduce sales (price elasticity)
-- 📢 **Promotions (`feat`) have a large positive impact** — featured products see a 2–3× sales lift
-- 🏷️ **Brand identity matters** — some brands consistently outsell others independent of price
-- 📊 **Tree-based models outperform linear models** — nonlinear interactions dominate demand
+- **Best model: {best_row['Model']}** — Test RMSE = **{best_row['RMSE']:.4f}**, R² = **{best_row['R2']:.4f}**
+- **Price is the single strongest predictor** — higher prices strongly reduce sales (price elasticity)
+- **Promotions (`feat`) have a large positive impact** — featured products see a 2–3× sales lift
+- **Brand identity matters** — some brands consistently outsell others independent of price
+- **Tree-based models outperform linear models** — nonlinear interactions dominate demand
 """)
 
 # ═════════════════════════════════════════════════════════════════════════════
 # TAB 2 — DESCRIPTIVE ANALYTICS
 # ═════════════════════════════════════════════════════════════════════════════
 with tabs[1]:
-    st.header("📊 Descriptive Analytics")
+    st.header("Descriptive Analytics")
     st.markdown("""
 Before building any model, it is essential to understand the data. The visualizations below explore
 the target distribution, key feature relationships, and the overall correlation structure.
@@ -303,7 +303,7 @@ demographic features may inflate linear model coefficients but does not affect t
 # TAB 3 — MODEL PERFORMANCE
 # ═════════════════════════════════════════════════════════════════════════════
 with tabs[2]:
-    st.header("🤖 Model Performance Comparison")
+    st.header("Model Performance Comparison")
     st.markdown("""
 Seven models were trained on a **70% training set** and evaluated on a held-out **30% test set**
 (`random_state=42`). Tree-based models were tuned via **5-fold cross-validation with GridSearchCV**.
@@ -316,7 +316,7 @@ Metrics are computed on the held-out test set only — no data leakage.
 """)
 
     # 2.7 Results table — always available from live-trained models
-    st.subheader("📋 Results Table (green = best per column)")
+    st.subheader("Results Table (green = best per column)")
 
     # Prefer model_results.csv if available (from GridSearchCV-tuned training)
     # Fall back to live metrics computed above
@@ -336,7 +336,7 @@ Metrics are computed on the held-out test set only — no data leakage.
     )
 
     # 2.7 Bar chart
-    st.subheader("📊 RMSE Comparison (lower = better)")
+    st.subheader("RMSE Comparison (lower = better)")
     fig, ax = plt.subplots(figsize=(8, 4))
     sorted_r = display_metrics.sort_values("RMSE").reset_index(drop=True)
     bar_colors = ["#2ecc71" if i == 0 else "#3498db" for i in range(len(sorted_r))]
@@ -352,7 +352,7 @@ improves demand prediction over linear baselines.
 """)
 
     # 2.3 Decision Tree visualization
-    st.subheader("🌳 Decision Tree Visualization (CART)")
+    st.subheader("Decision Tree Visualization (CART)")
     st.markdown("""
 The plot below shows the best Decision Tree fitted to the training data (depth capped at 3 for
 readability). Each node shows the split condition, number of samples, and MSE at that node.
@@ -375,7 +375,7 @@ consistent with the SHAP analysis.
         st.warning(f"Could not render decision tree: {e}")
 
     # 2.6 MLP Training Loss Curve
-    st.subheader("📉 Neural Network (MLP) Training Loss Curve")
+    st.subheader("Neural Network (MLP) Training Loss Curve")
     st.markdown("""
 The plot below shows how the MLP's training loss decreased over iterations, confirming the
 network converged successfully during training.
@@ -399,7 +399,7 @@ the model reached a stable solution.
         st.warning(f"Could not render MLP loss curve: {e}")
 
     # 2.4 / 2.5 Predicted vs Actual for all models
-    st.subheader("📈 Predicted vs. Actual — All Models")
+    st.subheader("Predicted vs. Actual — All Models")
     st.markdown("""
 Each plot shows predicted vs. actual `logmove` on the held-out test set. Points on the red
 diagonal indicate a perfect prediction. Tighter clustering = lower error.
@@ -429,7 +429,7 @@ they underfit the nonlinear demand patterns in the data.
 """)
 
     # Best hyperparameters
-    st.subheader("⚙️ Best Hyperparameters (from GridSearchCV in train_models.py)")
+    st.subheader("Best Hyperparameters (from GridSearchCV in train_models.py)")
     st.markdown("""
 | Model | Parameters Tuned | Best Values |
 |---|---|---|
@@ -444,7 +444,7 @@ they underfit the nonlinear demand patterns in the data.
 """)
 
     # 2.7 Model Discussion
-    st.subheader("🧠 Model Discussion")
+    st.subheader("Model Discussion")
     best_model_name = display_metrics.sort_values("RMSE").iloc[0]["Model"]
     st.markdown(f"""
 **Best performing model: {best_model_name}** based on test-set RMSE.
@@ -468,7 +468,7 @@ store demographics. The MLP is competitive but requires more careful tuning to m
 with tabs[3]:
 
     # ── SHAP ─────────────────────────────────────────────────────────────────
-    st.header("🔍 Model Explainability (SHAP)")
+    st.header("Model Explainability (SHAP)")
     st.markdown("""
 **SHAP (SHapley Additive exPlanations)** is a game-theoretic framework for explaining individual
 model predictions. Each feature is assigned a SHAP value — its contribution to pushing the
@@ -549,7 +549,7 @@ because its prediction deviates most from the average, making feature contributi
 visible and interpretable.
 """)
 
-        st.subheader("📝 SHAP Interpretation")
+        st.subheader("SHAP Interpretation")
         st.markdown("""
 **Which features have the strongest impact?**
 `price` and `feat` (promotion) consistently rank as the top two drivers across all observations,
@@ -568,7 +568,7 @@ to promotions enables more targeted and ROI-positive trade spending decisions.
 
     # ── Interactive Prediction ────────────────────────────────────────────────
     st.markdown("---")
-    st.header("🎯 Interactive Prediction")
+    st.header("Interactive Prediction")
     st.markdown("""
 Use the controls below to set feature values and see what any model predicts for weekly orange
 juice sales. Unset features default to their dataset mean (numeric) or most common value
@@ -621,8 +621,8 @@ juice sales. Unset features default to their dataset mean (numeric) or most comm
 
     st.markdown("---")
     ca, cb = st.columns(2)
-    ca.metric("📦 Predicted log(sales)", f"{prediction:.3f}")
-    cb.metric("📦 Predicted units sold (approx.)", f"{predicted_units:,}")
+    ca.metric("Predicted log(sales)", f"{prediction:.3f}")
+    cb.metric("Predicted units sold (approx.)", f"{predicted_units:,}")
 
     promo_str  = "ON" if feat_val == 1 else "OFF"
     brand_str  = f", brand = **{brand_val}**" if brand_val else ""
@@ -633,10 +633,10 @@ The **{selected_label}** model predicts ≈ **{predicted_units:,} units** sold
 """)
 
     # SHAP waterfall for custom input — shown for RF, info message for others
-    st.subheader("🌊 SHAP Waterfall for Your Input")
+    st.subheader("SHAP Waterfall for Your Input")
     if selected_label != "Random Forest":
         st.info(
-            f"ℹ️ SHAP waterfall is computed using the **Random Forest** model "
+            f"SHAP waterfall is computed using the **Random Forest** model "
             f"(required for TreeExplainer). You selected **{selected_label}** for prediction above. "
             f"The waterfall below shows how the Random Forest would explain this same input."
         )
